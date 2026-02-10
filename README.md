@@ -40,24 +40,38 @@ The audit documents an exhaustive list of exceptions for **`com.apple.wifiveloci
 
 ## Active Verification Toolkit
 
-Researchers can use the included **`VERIFY_INDICATORS.py`** script to audit their own devices for the indicators found in this disclosure.
+The repository includes a production-grade forensic utility, **`VERIFY_INDICATORS.py`**. This script allows researchers to automate the verification of the "Stepped-On Silicon" architecture by performing signature matching and deep-integrity audits against the provided forensic baseline.
 
 ### Usage
 
-1. Generate a `sysdiagnose` on your iPhone and extract the results.
-2. Execute the verification script against the extracted directory:
+1. **Generate Evidence**: Trigger a `sysdiagnose` on the target iPhone and extract the resulting `.tar.gz` file.
+2. **Execute the Audit**: Point the script at your extracted directory. For a comprehensive bit-for-bit validation, include the `--manifest` flag to cross-reference the entire 10GB evidence corpus.
+
 ```bash
+# Standard Forensic Scan
 python VERIFY_INDICATORS.py /path/to/sysdiagnose_directory
+
+# Deep Integrity Audit (Recommended for Full Disclosure Verification)
+python VERIFY_INDICATORS.py /path/to/sysdiagnose_directory --manifest FORENSIC_MANIFEST_AND_INTEGRITY_INDEX.csv
 
 ```
 
+---
 
-3. The script will automatically scan for matching **Trial UUIDs**, unauthorized **Policy Exceptions**, and verify file integrity against the **Forensic Manifest**.
+### Verification Layers
+
+The script operates across three distinct forensic layers to confirm device compromise:
+
+- **Network exfiltration Audit**: Scans proprietary binary unified logs (**`.tracev3`**) for the `kaylees.site` exfiltration domain and associated Icelandic tunnel telemetry.
+- **Update Framework Integrity**: Cross-references the **SUCore** (Software Update) logs to identify if the device has been provisioned with the unauthorized "Experiments" used for silent persistence.
+- **Privacy Gatekeeper Validation**: Checks the integrity of the **TCC.db** (Transparency, Consent, and Control) database to determine if Data Protection Policy Exceptions have been applied to bypass user-consent models for the Camera, Microphone, and Location services.
+
+
 
 ---
 
 ## Data Integrity and Reproducibility
 
-The **`FORENSIC_MANIFEST_AND_INTEGRITY_INDEX.csv`** provides a verifiable "Golden Image" of the system state. By comparing local file hashes against this manifest, researchers can prove the existence of identical exploit artifacts or unauthorized system configurations across different hardware.
+The **`FORENSIC_MANIFEST_AND_INTEGRITY_INDEX.csv`** provides a verifiable "Golden Image" of the system state. By comparing local file hashes against this manifest, you can prove the existence of identical exploit artifacts or unauthorized system configurations across different hardware.
 
 ---
