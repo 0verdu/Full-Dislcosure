@@ -82,8 +82,99 @@ def report_findings(matches):
     if matches["uuids"]:
         print("\n[!] ATTRIBUTION: KNOWN CONTROL PLANE EXPERIMENTS DETECTED")
         for m in matches["uuids"]: print(f"  - {m}")
+import os
+import hashlib
+import csv
+import argparse
+from datetime import datetime
 
-    if matches["exceptions"]:
+def calculate_sha256(file_path):
+    """Calculates the SHA-256 hash of a file."""
+    sha256_hash = hashlib.sha256()
+    try:
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except Exception:
+        return None
+
+def load_manifest(csv_path):
+    """Parses the Forensic Manifest CSV into a dictionary for lookup."""
+    manifest = {}
+    try:
+        with open(csv_path, mode='r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Expecting columns: 'filename' and 'sha256'
+                manifest[row['filename']] = row['sha256'].strip().lower()
+        return manifest
+    except Exception as e:
+        print(f"[-] Error loading manifest: {e}")
+        return None
+
+def run_integrity_audit(dump_path, csv_path):
+    print(f"[*] INITIATING CROSS-REFERENCE AUDIT")
+    print(f"[*] Target Directory: {dump_path}")
+    print(f"[*] Manifest Source: {csv_path}\n")
+
+    manifest = load_manifest(csv_path)
+    if not manifest:
+        return
+
+    matches = []
+    total_files_scanned = 0
+
+    # Indicators for manual signature scanning
+    TARGET_UUIDS = ["101940A3-1A17-3070-B11A-25D585B1BC44", "69C4C4BB-B5A4-5F59-8CDE-680F95FE76F1"]
+    EXFIL_DOMAIN = "kaylees.site"
+
+    for root, _, files in os.walk(dump_path):
+        for file in files:
+            total_files_scanned += 1
+            f_path = os.path.join(root, file)
+            
+            # 1. CROSS-REFERENCE HASHES FROM CSV
+            if file in manifest:
+                current_hash = calculate_sha256(f_path)
+                if current_hash == manifest[file]:
+                    matches.append(f"INTEGRITY_MATCH: {file} (Verified against Manifest)")
+
+            # 2. SIGNATURE OVERLAY
+            try:
+                with open(f_path, 'r', errors='ignore') as f:
+                    content = f.read()
+                    if EXFIL_DOMAIN in content:
+                        matches.append(f"NETWORK_EXFIL: {EXFIL_DOMAIN} detected in {file}")
+                    for uuid in TARGET_UUIDS:
+                        if uuid in content:
+                            matches.append(f"CONTROL_PLANE: {uuid} detected in {file}")
+            except:
+                continue
+
+    # --- FINAL REPORT ---
+    print("="*80)
+    print(" PROJECT STEPPED-ON SILICON: CROSS-DEVICE VERIFICATION REPORT")
+    print("="*80)
+    print(f"Files Scanned: {total_files_scanned}")
+    
+    if not matches:
+        print("\n[-] No matches detected. System diverges from the D74AP baseline.")
+    else:
+        print(f"Matches Found: {len(set(matches))}")
+        print("\n[!] VERIFIED INDICATORS:")
+        for m in sorted(set(matches)):
+            print(f"    - {m}")
+    
+    print("\n" + "="*80)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Cross-reference sysdiagnose with Project Stepped-On Silicon Manifest")
+    parser.add_argument("dump", help="Path to the extracted sysdiagnose folder")
+    parser.add_argument("manifest", help="Path to FORENSIC_MANIFEST_AND_INTEGRITY_INDEX.csv")
+    args = parser.parse_args()
+    
+    run_integrity_audit(args.dump, args.manifest)    if matches["exceptions"]:
         print("\n[!] AUDIT: UNAUTHORIZED SECURITY EXCEPTIONS DETECTED")
         for m in matches["exceptions"]: print(f"  - {m}")
 
